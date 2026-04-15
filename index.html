@@ -16,266 +16,199 @@
         color: white;
         display: flex;
         align-items: center;
-        padding: 0 20px;
-        font-size: 20px;
-        justify-content: space-between;
-    }
-
-    #header a {
-        color: #ffcc00;
-        text-decoration: none;
-        font-weight: bold;
-    }
-
-    #toolbar {
-        height: 60px;
-        background: #eee;
-        display: flex;
-        align-items: center;
-        padding: 5px;
+        padding: 0 10px;
         gap: 10px;
     }
 
     button {
         padding: 8px 12px;
-        font-size: 16px;
+        border: none;
+        background: #444;
+        color: white;
         cursor: pointer;
+        border-radius: 4px;
+    }
+
+    button:hover {
+        background: #666;
+    }
+
+    #colorPicker {
+        position: absolute;
+        left: 10px;
+        top: 70px;
+        height: 300px;
+    }
+
+    #etsyLink {
+        margin-left: auto;
+        color: yellow;
+        font-weight: bold;
+        text-decoration: none;
+    }
+
+    #etsyLink:hover {
+        color: orange;
     }
 
     canvas {
-        position: absolute;
-        top: 110px;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        cursor: crosshair;
+        display: block;
+        background: white;
     }
 </style>
 </head>
-
 <body>
 
 <div id="header">
-    <div>🎨 Maluniversum XXL</div>
-    <a href="https://www.etsy.com" target="_blank">Mein Etsy‑Shop</a>
+    <button onclick="setTool('pen')">Stift</button>
+    <button onclick="setTool('eraser')">Radierer</button>
+    <button onclick="setTool('rainbow')">Regenbogen</button>
+    <button onclick="setTool('spray')">Spray</button>
+    <button onclick="undo()">Undo</button>
+    <button onclick="redo()">Redo</button>
+    <button onclick="addEmoji()">Emoji</button>
+    <button onclick="addHeart()">Herz</button>
+    <button onclick="addTaxi()">Taxi</button>
+    <button onclick="clearCanvas()">Alles löschen</button>
+    <button onclick="saveImage()">Speichern</button>
+
+    <a id="etsyLink" href="https://www.etsy.com/ch/shop/Maluniversum" target="_blank">
+        Mein Etsy‑Shop
+    </a>
 </div>
 
-<div id="toolbar">
-    <input type="color" id="colorPicker" value="#ff0000">
-    <input type="range" id="sizePicker" min="1" max="50" value="5">
+<input type="color" id="colorPicker" value="#ff0000">
 
-    <button id="pencilBtn">Stift</button>
-    <button id="eraserBtn">Radierer</button>
-    <button id="rainbowBtn">Regenbogen</button>
-    <button id="sprayBtn">Spray</button>
-
-    <button id="undoBtn">Undo</button>
-    <button id="redoBtn">Redo</button>
-
-    <button id="emojiBtn">😊 Emoji</button>
-
-    <button id="tplHerzBtn">❤️ Herz</button>
-    <button id="tplTaxiBtn">🚕 Taxi</button>
-
-    <button id="clearBtn">Alles löschen</button>
-    <button id="saveBtn">Speichern</button>
-</div>
-
-<canvas id="c"></canvas>
+<canvas id="canvas"></canvas>
 
 <script>
-window.addEventListener("load", () => {
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let drawing = false;
+let tool = "pen";
+let color = "#ff0000";
+let rainbowHue = 0;
 
-    const c = document.getElementById("c");
-    const ctx = c.getContext("2d");
+let undoStack = [];
+let redoStack = [];
 
-    function resizeCanvas() {
-        c.width = window.innerWidth;
-        c.height = window.innerHeight - 110;
-        redrawFromHistory();
-    }
-    window.addEventListener("resize", resizeCanvas);
-    resizeCanvas();
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight - 50;
+}
+resizeCanvas();
+window.onresize = resizeCanvas;
 
-    let painting = false;
-    let currentColor = "#ff0000";
-    let currentSize = 5;
-    let tool = "pencil";
-    let rainbowHue = 0;
-    let currentEmoji = null;
+document.getElementById("colorPicker").oninput = (e) => {
+    color = e.target.value;
+};
 
-    let history = [];
-    let historyStep = -1;
+canvas.onmousedown = (e) => {
+    drawing = true;
+    saveState();
+    draw(e);
+};
 
-    function saveHistory() {
-        if (historyStep < history.length - 1) {
-            history = history.slice(0, historyStep + 1);
-        }
-        history.push(c.toDataURL());
-        historyStep++;
-    }
+canvas.onmouseup = () => drawing = false;
+canvas.onmouseleave = () => drawing = false;
 
-    function redrawFromHistory() {
-        if (historyStep >= 0) {
-            const img = new Image();
-            img.src = history[historyStep];
-            img.onload = () => ctx.drawImage(img, 0, 0);
-        }
-    }
+canvas.onmousemove = draw;
 
-    function startPosition(e) {
-        painting = true;
-        draw(e);
-    }
+function draw(e) {
+    if (!drawing) return;
 
-    function endPosition() {
-        painting = false;
-        ctx.beginPath();
-        saveHistory();
-    }
+    const x = e.clientX;
+    const y = e.clientY - 50;
 
-    function draw(e) {
-        if (!painting) return;
-
-        const x = e.clientX;
-        const y = e.clientY - 110;
-
-        if (tool === "emoji" && currentEmoji) {
-            ctx.font = currentSize * 4 + "px Arial";
-            ctx.fillText(currentEmoji, x, y);
-            return;
-        }
-
-        if (tool === "spray") {
-            for (let i = 0; i < 20; i++) {
-                const offsetX = (Math.random() - 0.5) * currentSize * 4;
-                const offsetY = (Math.random() - 0.5) * currentSize * 4;
-                ctx.fillStyle = currentColor;
-                ctx.fillRect(x + offsetX, y + offsetY, 1, 1);
-            }
-            return;
-        }
-
-        if (tool === "rainbow") {
-            rainbowHue = (rainbowHue + 2) % 360;
-            ctx.strokeStyle = `hsl(${rainbowHue}, 100%, 50%)`;
-        } else if (tool === "eraser") {
-            ctx.strokeStyle = "white";
-        } else {
-            ctx.strokeStyle = currentColor;
-        }
-
-        ctx.lineWidth = currentSize;
-        ctx.lineCap = "round";
-
+    if (tool === "pen") {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 4;
         ctx.lineTo(x, y);
         ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(x, y);
     }
 
-    c.addEventListener("mousedown", startPosition);
-    c.addEventListener("mouseup", endPosition);
-    c.addEventListener("mousemove", draw);
-
-    document.getElementById("colorPicker").addEventListener("input", e => {
-        currentColor = e.target.value;
-        tool = "pencil";
-    });
-
-    document.getElementById("sizePicker").addEventListener("input", e => {
-        currentSize = e.target.value;
-    });
-
-    document.getElementById("pencilBtn").onclick = () => tool = "pencil";
-    document.getElementById("eraserBtn").onclick = () => tool = "eraser";
-    document.getElementById("rainbowBtn").onclick = () => tool = "rainbow";
-    document.getElementById("sprayBtn").onclick = () => tool = "spray";
-
-    document.getElementById("emojiBtn").onclick = () => {
-        const emoji = prompt("Welches Emoji möchtest du malen?");
-        if (emoji) {
-            currentEmoji = emoji;
-            tool = "emoji";
-        }
-    };
-
-    document.getElementById("undoBtn").onclick = () => {
-        if (historyStep > 0) {
-            historyStep--;
-            redrawFromHistory();
-        }
-    };
-
-    document.getElementById("redoBtn").onclick = () => {
-        if (historyStep < history.length - 1) {
-            historyStep++;
-            redrawFromHistory();
-        }
-    };
-
-    document.getElementById("clearBtn").onclick = () => {
-        ctx.clearRect(0, 0, c.width, c.height);
-        saveHistory();
-    };
-
-    document.getElementById("saveBtn").onclick = () => {
-        const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = c.width;
-        tempCanvas.height = c.height;
-        const tctx = tempCanvas.getContext("2d");
-
-        tctx.fillStyle = "white";
-        tctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-        tctx.drawImage(c, 0, 0);
-
-        tctx.font = "20px Arial";
-        tctx.fillStyle = "black";
-        tctx.fillText("© Charlytaxi", 20, tempCanvas.height - 20);
-
-        const link = document.createElement("a");
-        link.download = "zeichnung.png";
-        link.href = tempCanvas.toDataURL();
-        link.click();
-    };
-
-    function clearForTemplate() {
-        ctx.clearRect(0, 0, c.width, c.height);
-    }
-
-    document.getElementById("tplHerzBtn").onclick = () => {
-        clearForTemplate();
-        ctx.save();
-        ctx.strokeStyle = "black";
-        ctx.lineWidth = 3;
-
-        const cx = c.width / 2;
-        const cy = c.height / 2;
-
-        ctx.beginPath();
-        ctx.moveTo(cx, cy + 60);
-        ctx.bezierCurveTo(cx - 150, cy - 40, cx - 40, cy - 160, cx, cy - 60);
-        ctx.bezierCurveTo(cx + 40, cy - 160, cx + 150, cy - 40, cx, cy + 60);
-
+    if (tool === "eraser") {
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 20;
+        ctx.lineTo(x, y);
         ctx.stroke();
-        ctx.restore();
-        saveHistory();
-    };
+    }
 
-    document.getElementById("tplTaxiBtn").onclick = () => {
-        clearForTemplate();
-        ctx.save();
-        ctx.strokeStyle = "black";
-        ctx.lineWidth = 3;
+    if (tool === "rainbow") {
+        rainbowHue = (rainbowHue + 2) % 360;
+        ctx.strokeStyle = `hsl(${rainbowHue}, 100%, 50%)`;
+        ctx.lineWidth = 5;
+        ctx.lineTo(x, y);
+        ctx.stroke();
+    }
 
-        ctx.strokeRect(c.width/2 - 100, c.height/2 - 40, 200, 80);
+    if (tool === "spray") {
+        for (let i = 0; i < 20; i++) {
+            const offsetX = (Math.random() - 0.5) * 20;
+            const offsetY = (Math.random() - 0.5) * 20;
+            ctx.fillStyle = color;
+            ctx.fillRect(x + offsetX, y + offsetY, 2, 2);
+        }
+    }
 
-        ctx.restore();
-        saveHistory();
-    };
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+}
 
-    saveHistory();
-});
+function setTool(t) {
+    tool = t;
+    ctx.beginPath();
+}
+
+function addEmoji() {
+    ctx.font = "40px Arial";
+    ctx.fillText("😊", 100, 100);
+}
+
+function addHeart() {
+    ctx.font = "40px Arial";
+    ctx.fillText("❤️", 160, 100);
+}
+
+function addTaxi() {
+    ctx.font = "40px Arial";
+    ctx.fillText("🚕", 220, 100);
+}
+
+function clearCanvas() {
+    saveState();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function saveImage() {
+    const link = document.createElement("a");
+    link.download = "Maluniversum.png";
+    link.href = canvas.toDataURL();
+    link.click();
+}
+
+function saveState() {
+    undoStack.push(canvas.toDataURL());
+    redoStack = [];
+}
+
+function undo() {
+    if (undoStack.length === 0) return;
+    redoStack.push(canvas.toDataURL());
+    restoreState(undoStack.pop());
+}
+
+function redo() {
+    if (redoStack.length === 0) return;
+    undoStack.push(canvas.toDataURL());
+    restoreState(redoStack.pop());
+}
+
+function restoreState(dataUrl) {
+    const img = new Image();
+    img.src = dataUrl;
+    img.onload = () => ctx.drawImage(img, 0, 0);
+}
 </script>
 
 </body>
