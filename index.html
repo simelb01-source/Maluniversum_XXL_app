@@ -72,6 +72,12 @@
     <button onclick="clearCanvas()">Alles löschen</button>
     <button onclick="saveImage()">Speichern</button>
 
+    <!-- ⭐ Pinselstärke-Regler (Option B) -->
+    <label style="color:white; margin-left:10px;">
+        Stärke:
+        <input type="range" id="brushSize" min="1" max="50" value="5" style="vertical-align:middle;">
+    </label>
+
     <a id="etsyLink" href="https://www.etsy.com/ch/shop/Maluniversum" target="_blank">
         Mein Etsy‑Shop
     </a>
@@ -89,6 +95,8 @@ let tool = "pen";
 let color = "#ff0000";
 let rainbowHue = 0;
 
+let brushSize = 5; // ⭐ Neue Variable für Pinselstärke
+
 let undoStack = [];
 let redoStack = [];
 
@@ -101,6 +109,10 @@ window.onresize = resizeCanvas;
 
 document.getElementById("colorPicker").oninput = (e) => {
     color = e.target.value;
+};
+
+document.getElementById("brushSize").oninput = (e) => {
+    brushSize = parseInt(e.target.value);
 };
 
 canvas.onmousedown = (e) => {
@@ -122,14 +134,14 @@ function draw(e) {
 
     if (tool === "pen") {
         ctx.strokeStyle = color;
-        ctx.lineWidth = 4;
+        ctx.lineWidth = brushSize;
         ctx.lineTo(x, y);
         ctx.stroke();
     }
 
     if (tool === "eraser") {
         ctx.strokeStyle = "white";
-        ctx.lineWidth = 20;
+        ctx.lineWidth = brushSize * 4;
         ctx.lineTo(x, y);
         ctx.stroke();
     }
@@ -137,7 +149,7 @@ function draw(e) {
     if (tool === "rainbow") {
         rainbowHue = (rainbowHue + 2) % 360;
         ctx.strokeStyle = `hsl(${rainbowHue}, 100%, 50%)`;
-        ctx.lineWidth = 5;
+        ctx.lineWidth = brushSize;
         ctx.lineTo(x, y);
         ctx.stroke();
     }
